@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-app-bg: 248 245 239;
+    --color-app-bg-warm: 255 253 248;
+    --color-app-text: 29 42 47;
+    --color-app-muted: 93 107 113;
+    --color-app-border: 216 209 196;
+    --color-surface-base: 255 255 255;
+    --color-surface-soft: 239 230 216;
+    --color-surface-inverted: 29 42 47;
+    --color-accent-lime: 111 221 113;
+    --color-accent-forest: 15 109 86;
+    --color-accent-coral: 255 123 84;
+    --color-status-success: 15 109 86;
+    --color-status-danger: 255 123 84;
+    --color-status-neutral: 29 42 47;
+    --color-overlay: 17 23 28;
+    --shadow-card: 0 18px 40px rgba(14, 34, 28, 0.08);
+    --shadow-soft: 0 24px 60px rgba(14, 34, 28, 0.12);
+  }
+
+  :root.dark,
+  html.dark,
+  body.dark {
+    --color-app-bg: 15 20 24;
+    --color-app-bg-warm: 23 30 35;
+    --color-app-text: 234 239 241;
+    --color-app-muted: 152 166 172;
+    --color-app-border: 68 80 87;
+    --color-surface-base: 24 31 36;
+    --color-surface-soft: 33 42 48;
+    --color-surface-inverted: 7 11 14;
+    --color-accent-lime: 133 232 128;
+    --color-accent-forest: 44 172 131;
+    --color-accent-coral: 255 146 110;
+    --color-status-success: 133 232 128;
+    --color-status-danger: 255 146 110;
+    --color-status-neutral: 234 239 241;
+    --color-overlay: 3 6 8;
+    --shadow-card: 0 18px 42px rgba(0, 0, 0, 0.34);
+    --shadow-soft: 0 28px 72px rgba(0, 0, 0, 0.42);
+  }
+
+  html {
+    background-color: rgb(var(--color-app-bg));
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    min-height: 100vh;
+    background-color: rgb(var(--color-app-bg));
+    color: rgb(var(--color-app-text));
+  }
+
+  ::selection {
+    background-color: rgb(var(--color-accent-lime) / 0.28);
+    color: rgb(var(--color-app-text));
+  }
+}
+
+@layer utilities {
+  .bg-auth-hero {
+    background-image:
+      radial-gradient(ellipse at top left, rgb(var(--color-accent-lime) / 0.18), transparent 52%),
+      radial-gradient(ellipse at top right, rgb(var(--color-accent-coral) / 0.14), transparent 44%),
+      linear-gradient(180deg, rgb(var(--color-app-bg-warm)) 0%, rgb(var(--color-app-bg)) 80%);
+  }
+}

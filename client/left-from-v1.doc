@@ -1,0 +1,17 @@
+What's Not in v1
+
+  These APIs exist but I'd skip them in the first build to stay lean:
+
+  - Analytics (/analytics/summary, /trends, /categories, /members) — useful
+  later for a "Stats" tab
+  - Tags — add to expenses in v2 once core loop is stable
+  - Recurring expenses — useful for rent but complex UX, v2
+  - Activity feed as its own screen — show on Home, skip dedicated tab for now
+  - Custom categories — use system categories, add custom in v2
+
+  ---
+  Anything you want to go deeper on? I can expand any specific screen, nail
+  down the exact add-expense UX, or map out the empty/error states in more
+  detail before we start building.
+
+✻ Baked for 3m 20s

@@ -1,0 +1,641 @@
+Splitwise App — Design Document
+
+  Overview
+
+  4 flatmates sharing one apartment. Primary loop: add expense → check balance
+   → settle up. Secondary: see history, group totals, per-person breakdown.
+  Design principle: every common action should take under 5 seconds.
+
+  ---
+  Navigation Structure
+
+  Bottom Tabs (mobile) / Top Nav (desktop)
+  ├── Home          personal balance, all groups, recent activity
+  ├── Groups        groups list → group detail
+  └── You           profile, settings
+
+  Add Expense is accessible everywhere via a floating "+" button — not scoped
+  to a tab.
+
+  ---
+  Screen Inventory
+
+  ---
+  1. Login
+
+  Route: /login
+
+  ┌─────────────────────────────┐
+  │                             │
+  │  Splitwise                  │
+  │  Sign in to continue        │
+  │                             │
+  │  [Email                   ] │
+  │  [Password           Forgot]│
+  │                             │
+  │  [       Sign in          ] │
+  │  [   Continue with Google  ]│
+  │                             │
+  │  No account? Create one     │
+  └─────────────────────────────┘
+
+  API: POST /auth/login
+
+  ---
+  2. Register
+
+  Route: /register
+
+  ┌─────────────────────────────┐
+  │                             │
+  │  Splitwise                  │
+  │  Create an account          │
+  │                             │
+  │  [Name                    ] │
+  │  [Email                   ] │
+  │  [Password (min 8)        ] │
+  │                             │
+  │  [     Create account     ] │
+  │                             │
+  │  Already have one? Sign in  │
+  └─────────────────────────────┘
+
+  API: POST /auth/register
+
+  ---
+  3. Home — Personal Dashboard
+
+  Route: /
+
+  The opening screen after login. Answers: "where do I stand right now?"
+
+  ┌─────────────────────────────┐
+  │ Hi, Mohak       [Splitwise] │
+  │                             │
+  │ ┌─── NET BALANCE ─────────┐ │
+  │ │                         │ │
+  │ │  ₹500 ↑                 │ │  ← green if positive, coral if negative
+  │ │  You're owed overall    │ │
+  │ │                         │ │
+  │ │  Owed to you   You owe  │ │
+  │ │     ₹850         ₹350   │ │
+  │ └─────────────────────────┘ │
+  │                             │
+  │ GROUPS                  All→│
+  │ ┌─────────────────────────┐ │
+  │ │ Flat 4B   household     │ │
+  │ │ 4 members      -₹450   →│ │  ← coral (you owe)
+  │ └─────────────────────────┘ │
+  │ ┌─────────────────────────┐ │
+  │ │ Raj & Mohak  personal   │ │
+  │ │ 2 members      +₹150   →│ │  ← green (owed to you)
+  │ └─────────────────────────┘ │
+  │                             │
+  │ RECENT                      │
+  │ Raj added Electricity...    │
+  │ 2h ago · Flat 4B            │
+  │ ───────────────────────     │
+  │ You paid Groceries ₹1,200   │
+  │ Yesterday · Flat 4B         │
+  └─────────────────────────────┘
+                [＋]              ← FAB, always visible
+
+  States:
+  - Loading: skeleton cards
+  - No groups: "Create your first group" CTA in place of groups section
+  - All settled: balance card says "All settled up ✓" in neutral
+
+  APIs: GET /users/me/dashboard
+
+  ---
+  4. Groups List
+
+  Route: /groups
+
+  ┌─────────────────────────────┐
+  │ Groups              [+ New] │
+  │                             │
+  │ HOUSEHOLD                   │
+  │ ┌─────────────────────────┐ │
+  │ │ Flat 4B                 │ │
+  │ │ 4 members · admin -₹450→│ │
+  │ └─────────────────────────┘ │
+  │                             │
+  │ PERSONAL                    │
+  │ ┌─────────────────────────┐ │
+  │ │ Raj & Mohak             │ │
+  │ │ 2 members       +₹150  →│ │
+  │ └─────────────────────────┘ │
+  │                             │
+  │ (empty state if no groups)  │
+  └─────────────────────────────┘
+                [＋]
+
+  "+ New" → Create Group Sheet
+
+  APIs: GET /groups
+
+  ---
+  5. Group Detail
+
+  Route: /groups/:id
+
+  Three sub-tabs. Header stays fixed, tabs switch the content below.
+
+  ┌─────────────────────────────┐
+  │ ←  Flat 4B          [＋][⋯]│  ← back, add expense, overflow menu
+  │    4 members                │
+  │ [Expenses][Balances][Members]│
+  │ ─────────────────────────── │
+  │                             │
+  │  (tab content below)        │
+  │                             │
+  └─────────────────────────────┘
+
+  Overflow menu (⋯): Edit group name / Delete group (admin only)
+
+  ---
+  5a. Expenses Tab (default)
+
+  │ THIS MONTH  ₹18,400  34 exp│  ← summary strip
+  │ ─────────────────────────── │
+  │                             │
+  │ MAR 15                      │
+  │ ┌─────────────────────────┐ │
+  │ │🛒 Groceries      ₹1,200 │ │
+  │ │   Mohak paid            │ │
+  │ │   Your share  ₹300      │ │  ← coral if you owe it, neutral if you paid
+  │ └─────────────────────────┘ │
+  │                             │
+  │ MAR 10                      │
+  │ ┌─────────────────────────┐ │
+  │ │⚡ Electricity    ₹800   │ │
+  │ │   Raj paid              │ │
+  │ │   Your share  ₹200      │ │
+  │ └─────────────────────────┘ │
+  │                             │
+  │ [Load more...]              │
+
+  - Tapping an expense → Expense Detail
+  - [＋] in header → Add Expense Sheet (pre-fills this group)
+  - Search icon (optional, v2)
+
+  APIs: GET /groups/:id/expenses (paginated, sort by date desc)
+
+  ---
+  5b. Balances Tab
+
+  │ ┌─── YOUR BALANCE ────────┐ │
+  │ │ You owe net  ₹450       │ │
+  │ │ Owed to you   ₹200      │ │
+  │ │ You owe       ₹650      │ │
+  │ └─────────────────────────┘ │
+  │                             │
+  │ WITH EACH PERSON            │
+  │ ┌─────────────────────────┐ │
+  │ │ Raj                     │ │
+  │ │ You owe ₹350            │ │
+  │ │              [Settle up]│ │  ← green pill button
+  │ └─────────────────────────┘ │
+  │ ┌─────────────────────────┐ │
+  │ │ Priya                   │ │
+  │ │ Owes you ₹200           │ │
+  │ │          [Remind] (v2)  │ │
+  │ └─────────────────────────┘ │
+  │ ┌─────────────────────────┐ │
+  │ │ Karan                   │ │
+  │ │ Settled ✓               │ │
+  │ └─────────────────────────┘ │
+  │                             │
+  │ SIMPLIFIED PLAN             │
+  │ To settle everything:       │
+  │ → Pay Raj ₹350              │
+  │ → Karan pays you ₹150       │
+
+  "Settle up" → opens Settle Up Sheet pre-filled with that person + amount
+
+  APIs: GET /groups/:id/balances/me, GET /groups/:id/balances/simplified
+
+  ---
+  5c. Members Tab
+
+  │ MEMBERS (4)                 │
+  │ ┌─────────────────────────┐ │
+  │ │ [M] Mohak (you)  admin  │ │
+  │ │ mohak@example.com       │ │
+  │ └─────────────────────────┘ │
+  │ ┌─────────────────────────┐ │
+  │ │ [R] Raj          member │ │
+  │ │ raj@example.com         │ │
+  │ │           [⋯ admin only]│ │  ← change role / remove
+  │ └─────────────────────────┘ │
+  │ ... (Priya, Karan)          │
+  │                             │
+  │ (admin only)                │
+  │ [+ Add member by email]     │
+
+  APIs: GET /groups/:id, POST /groups/:id/members, PATCH
+  /groups/:id/members/:uid, DELETE /groups/:id/members/:uid
+
+  ---
+  6. Add Expense — Bottom Sheet → Full Screen
+
+  Trigger: any [＋] button
+
+  This is the most important screen. Two modes: Quick (default) and Advanced
+  (user expands).
+
+  Quick mode (default, fits in one screen)
+
+  ┌─── Add Expense ──────── [✕]┐
+  │                             │
+  │   ₹  [    0.00           ] │  ← large, auto-focused
+  │                             │
+  │   What for?                 │
+  │   [                       ] │
+  │                             │
+  │   Paid by                   │
+  │   [● Mohak (you)        ▾ ] │
+  │                             │
+  │   Category                  │
+  │   [🛒][🏠][⚡][🍕][🚗][📦][+]│
+  │                             │
+  │   Split between             │
+  │   [●Mohak][●Raj][●Priya][●K]│  ← all selected by default
+  │   Equal · ₹300 each         │  ← live preview
+  │                             │
+  │   ﹀ More options            │  ← expands below
+  │                             │
+  │   [       Add Expense     ] │
+  └─────────────────────────────┘
+
+  Expanded "More options"
+
+  │   Split type                │
+  │   [Equal ●] [Exact] [%] [÷]│
+  │                             │
+  │   Date       [Today      ▾]│
+  │                             │
+  │   Tags       [+ Add tag   ]│
+  │                             │
+  │   Notes      [             ]│
+  │                             │
+  │   Recurring  [ ] Off       │
+
+  Split type: Exact
+
+  │   Split between  (₹1,200)  │
+  │   ┌───────────────────────┐ │
+  │   │ Mohak     [  600.00 ] │ │
+  │   │ Raj       [  300.00 ] │ │
+  │   │ Priya     [  200.00 ] │ │
+  │   │ Karan     [  100.00 ] │ │
+  │   └───────────────────────┘ │
+  │   ✓ ₹1,200 — fully assigned │  ← live validation
+
+  Split type: Percentage
+
+  │   Mohak     [ 50 ]%  ₹600  │
+  │   Raj       [ 25 ]%  ₹300  │
+  │   Priya     [ 15 ]%  ₹180  │
+  │   Karan     [ 10 ]%  ₹120  │
+  │   100% assigned             │
+
+  States:
+  - Amount 0 → "Add Expense" button disabled
+  - Description empty → button disabled
+  - Exact/% split doesn't sum → button disabled, shows "₹X remaining" in red
+  - Success → sheet closes, list refreshes, brief toast "Expense added"
+
+  Group pre-selection: If launched from inside a group → group picker is
+  hidden and pre-filled. If from Home → show group picker first.
+
+  APIs: POST /groups/:id/expenses, optionally POST
+  /groups/:id/expenses/preview (for live split preview)
+
+  ---
+  7. Expense Detail
+
+  Route: /groups/:id/expenses/:expenseId
+
+  ┌─────────────────────────────┐
+  │ ← Back             [Edit]  │  ← edit only if creator or admin
+  │                             │
+  │ 🛒                          │
+  │ Groceries                   │
+  │ ₹1,200.00                   │
+  │ March 15, 2024              │
+  │                             │
+  │ ─────────────────────────── │
+  │ Paid by   Mohak             │
+  │ Split     Equal             │
+  │ Group     Flat 4B           │
+  │                             │
+  │ ─────────────────────────── │
+  │ WHO OWES WHAT               │
+  │ Mohak (you)       ₹300 ✓   │  ← paid, no debt
+  │ Raj               ₹300     │  ← owes Mohak
+  │ Priya             ₹300     │
+  │ Karan             ₹300     │
+  │                             │
+  │ Tags     Goa trip           │
+  │ Notes    Big shop before... │
+  │                             │
+  │ Added by Mohak · 2h ago     │
+  │                             │
+  │ ─────────────────────────── │
+  │ [     Delete expense      ] │  ← coral, only for creator/admin
+  └─────────────────────────────┘
+
+  Edit → re-opens Add Expense sheet pre-filled
+
+  APIs: GET /groups/:id/expenses/:expenseId, PUT
+  /groups/:id/expenses/:expenseId, DELETE /groups/:id/expenses/:expenseId
+
+  ---
+  8. Settle Up — Bottom Sheet
+
+  Trigger: "Settle up" button on Balances tab
+
+  ┌─── Settle up ────────── [✕]┐
+  │                             │
+  │ You → Raj                  │  ← direction shown clearly
+  │                             │
+  │   ₹  [    350.00         ] │  ← pre-filled with owed amount, editable
+  │                             │
+  │   Date    [Today         ▾]│
+  │                             │
+  │   Note    [GPay transfer  ]│
+  │                             │
+  │   [     Record payment    ] │  ← accent-forest button
+  └─────────────────────────────┘
+
+  Amount is editable — partial settlements are allowed.
+
+  After success: sheet closes, balances tab refreshes, toast "Payment
+  recorded".
+
+  APIs: POST /groups/:id/settlements or POST
+  /groups/:id/settlements/settle-with/:userId (one-tap exact amount)
+
+  ---
+  9. Create Group — Bottom Sheet
+
+  Trigger: [+ New] on Groups page
+
+  ┌─── New Group ─────────── [✕]┐
+  │                             │
+  │   Name                      │
+  │   [Flat 4B                ] │
+  │                             │
+  │   Type                      │
+  │   [● Household] [Personal]  │
+  │                             │
+  │   Description (optional)    │
+  │   [Our apartment on 4th...] │
+  │                             │
+  │   [       Create Group    ] │
+  └─────────────────────────────┘
+
+  After creation → navigates to group detail (Members tab) with prompt: "Add
+  your flatmates to get started"
+
+  API: POST /groups
+
+  ---
+  10. Add Member — Sheet (inside group members tab, admin only)
+
+  ┌─── Add Member ─────────── [✕]┐
+  │                              │
+  │ They need a Splitwise account│
+  │                              │
+  │   Email                      │
+  │   [raj@example.com         ] │
+  │                              │
+  │   Role                       │
+  │   [● Member]  [Admin]        │
+  │                              │
+  │   [         Add            ] │
+  └──────────────────────────────┘
+
+  Error states: "No account found with this email" / "Already a member"
+
+  API: POST /groups/:id/members
+
+  ---
+  11. Profile
+
+  Route: /profile
+
+  ┌─────────────────────────────┐
+  │ Account                     │
+  │                             │
+  │ ┌─────────────────────────┐ │
+  │ │  [MG]  Mohak G          │ │  ← initials avatar
+  │ │        mohak@gmail.com  │ │
+  │ └─────────────────────────┘ │
+  │                             │
+  │ Change password          →  │
+  │                             │
+  │                             │
+  │ [        Sign out         ] │  ← coral, at bottom
+  └─────────────────────────────┘
+
+  Change password → inline expand (current password → new password → save)
+
+  APIs: GET /users/me, PUT /auth/password, POST /auth/logout
+
+  ---
+  User Journeys
+
+  Journey 1 — First use (onboarding)
+
+  Register → Home (empty, no groups)
+    → "Create your first group" CTA
+    → Create Group sheet → "Flat 4B"
+    → Group detail, Members tab
+    → "Add your flatmates" prompt
+    → Add Raj by email → Add Priya → Add Karan
+    → Group is ready
+    → Tap [＋] → Add first expense
+
+  ---
+  Journey 2 — Quick expense add (most common daily flow)
+
+  Open app → Home
+    → Tap [＋] FAB
+    → Add Expense sheet opens (amount focused)
+    → Type "1200"
+    → Type "Groceries"
+    → Category: 🛒 (tap)
+    → Paid by: Mohak (already selected)
+    → Participants: all 4 (already selected, equal split)
+    → Shows "₹300 each"
+    → Tap "Add Expense"
+    → Toast: "Added"
+    → Sheet closes, back on Home
+
+  Total taps: ~6. Time: ~10 seconds.
+
+  ---
+  Journey 3 — Check who I owe
+
+  Open app → Home
+    → Balance card: "You owe ₹450 overall"
+    → Tap "Flat 4B" group row
+    → Group Detail → Balances tab
+    → See: Raj — you owe ₹350
+    →        Priya — owes you ₹200
+    →        Karan — settled ✓
+    → Simplified: "Pay Raj ₹350 to clear everything"
+
+  ---
+  Journey 4 — Settle up
+
+  Group Balances tab
+    → Raj row → tap "Settle up"
+    → Sheet: "You → Raj, ₹350.00"
+    → Optionally edit amount (partial)
+    → Add note "GPay"
+    → "Record payment"
+    → Toast: "Recorded"
+    → Balances refresh — Raj now shows "Settled ✓"
+
+  ---
+  Journey 5 — Unequal rent split
+
+  Tap [＋] → Add Expense sheet
+    → Amount: 32000
+    → Description: "March Rent"
+    → Category: 🏠
+    → Paid by: Mohak
+    → Expand "More options"
+    → Split type → "Exact"
+    → Mohak: 8000, Raj: 9000, Priya: 7500, Karan: 7500
+    → Shows "₹32,000 — fully assigned ✓"
+    → "Add Expense"
+
+  ---
+  Journey 6 — Two-person expense (just Mohak & Raj)
+
+  Tap [＋] → Add Expense sheet
+    → Amount: 800 (dinner)
+    → Description: "Dinner, Bandra"
+    → Category: 🍕
+    → Paid by: Mohak
+    → Participants: deselect Priya and Karan (tap to toggle off)
+    → Shows "₹400 each"
+    → Add
+
+  ---
+  Journey 7 — View expense history / find something
+
+  Groups tab → Flat 4B → Expenses tab
+    → Scroll through list, sorted by date
+    → Grouped by month
+    → Tap an expense → Expense Detail
+    → See full split, who owes what
+
+  ---
+  Journey 8 — Someone added me to a group (new invite flow)
+
+  New user gets invited via email → they register
+    → They're already in the group (added by admin)
+    → Home shows "Flat 4B" with a balance
+    → They can start adding expenses immediately
+
+  (Note: The API adds by email — the person needs an account first. The UX
+  expectation: "make your account, I'll add you.")
+
+  ---
+  Key Design Decisions
+
+  1. Amount input — large, first, focused
+
+  The amount field is the first thing that appears and should be auto-focused.
+   On mobile this means the number keyboard comes up immediately. Large
+  display font (hero size) so you can see what you're typing.
+
+  2. All group members selected by default
+
+  In a 4-person flat, 90% of expenses involve all 4. Default to all-selected,
+  tap to deselect individuals. Faster than selecting one-by-one.
+
+  3. Equal split is the default
+
+  Most expenses are equal. Other split types hidden under "More options".
+  Equal shows the per-person amount live as you type the total.
+
+  4. No group selection step from group context
+
+  If you're inside a group and tap [＋], skip the group picker. If from Home,
+  show a group picker at the top of the add sheet.
+
+  5. Balance direction language
+
+  Always state direction explicitly: "You owe Raj ₹350" (not just "₹350 with
+  Raj"). Positive/negative sign conventions confuse people — plain English
+  doesn't.
+
+  6. Settle Up pre-fills the correct amount
+
+  "Settle up" from a person row pre-fills the net simplified amount. User can
+  lower it for partial settlement. Never pre-fill more than owed.
+
+  7. Sheet pattern for creation flows
+
+  Add Expense, Settle Up, Create Group, Add Member — all bottom sheets. Keeps
+  context. No deep navigation stack for common actions.
+
+  ---
+  Complete API → Screen Mapping
+
+  ┌──────────────┬────────────────────────────────────────────────────────┐
+  │    Screen    │                       APIs Used                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Login        │ POST /auth/login                                       │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Register     │ POST /auth/register                                    │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Home         │ GET /users/me/dashboard                                │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Groups List  │ GET /groups                                            │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Group        │ GET /groups/:id/expenses                               │
+  │ Expenses tab │                                                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Group        │ GET /groups/:id/balances/me, /balances/simplified      │
+  │ Balances tab │                                                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Group        │ GET /groups/:id                                        │
+  │ Members tab  │                                                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Add Expense  │ POST /groups/:id/expenses, optionally /preview         │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Expense      │ GET /groups/:id/expenses/:id                           │
+  │ Detail       │                                                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Edit Expense │ PUT /groups/:id/expenses/:id                           │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Delete       │ DELETE /groups/:id/expenses/:id                        │
+  │ Expense      │                                                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Settle Up    │ POST /groups/:id/settlements/settle-with/:uid or POST  │
+  │              │ /groups/:id/settlements                                │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Create Group │ POST /groups                                           │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Add Member   │ POST /groups/:id/members                               │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Change Role  │ PATCH /groups/:id/members/:uid                         │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Remove       │ DELETE /groups/:id/members/:uid                        │
+  │ Member       │                                                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Profile      │ GET /users/me                                          │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Change       │ PUT /auth/password                                     │
+  │ Password     │                                                        │
+  ├──────────────┼────────────────────────────────────────────────────────┤
+  │ Sign Out     │ POST /auth/logout                                      │
+  └──────────────┴────────────────────────────────────────────────────────┘
