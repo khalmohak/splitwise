@@ -1,0 +1,242 @@
+service: talo-backend
+
+frameworkVersion: "3"
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${opt:region, 'ap-south-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 512
+  timeout: 15
+  architecture: arm64
+  logRetentionInDays: 14
+  environment:
+    NODE_OPTIONS: --enable-source-maps
+    STAGE: ${self:provider.stage}
+    DATABASE_URL: ${env:DATABASE_URL}
+    S3_BUCKET: ${self:custom.s3Bucket}
+    ASYNC_JOBS_QUEUE_URL:
+      Ref: AsyncJobsQueue
+    RESEND_API_KEY: ${env:RESEND_API_KEY, ''}
+    RESEND_FROM_EMAIL: ${env:RESEND_FROM_EMAIL, 'noreply@talk.talo.club'}
+    FIREBASE_PROJECT_ID: ${env:FIREBASE_PROJECT_ID}
+    FIREBASE_SERVICE_ACCOUNT_B64: ${env:FIREBASE_SERVICE_ACCOUNT_B64, ''}
+    OPENAI_API_KEY: ${env:OPENAI_API_KEY}
+    APP_BASE_URL: ${env:APP_BASE_URL}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource:
+            - arn:aws:s3:::${self:custom.s3Bucket}/*
+        - Effect: Allow
+          Action:
+            - s3:ListBucket
+          Resource:
+            - arn:aws:s3:::${self:custom.s3Bucket}
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:ChangeMessageVisibility
+            - sqs:GetQueueAttributes
+          Resource:
+            - Fn::GetAtt:
+                - AsyncJobsQueue
+                - Arn
+  httpApi:
+    cors:
+      # Must stay in sync with ALLOWED_ORIGINS in src/app.ts. API Gateway
+      # handles preflights here; the Hono middleware handles GET/POST
+      # response headers. Both must agree or the browser will reject.
+      allowedOrigins:
+        - http://localhost:5173
+        - http://127.0.0.1:5173
+        - http://localhost:4173
+        - http://127.0.0.1:4173
+        - http://192.168.1.54:5173
+        - https://talo.club
+        - https://www.talo.club
+        - https://app.talo.club
+        - https://dev.app.talo.club
+        - http://100.106.39.43:5173
+        - https://100.106.39.43:5173
+        - http://100.106.39.43
+        - https://100.106.39.43
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      allowCredentials: true
+      maxAge: 86400
+
+custom:
+  apiCertificateIds:
+    dev: f1804a21-ef8a-4b71-8d12-85d38bfb8828
+    prod: 633db2c3-a7b1-4c63-a701-ad1762155eed
+  apiCertificateId: ${self:custom.apiCertificateIds.${self:provider.stage}}
+  apiDomains:
+    dev: dev-api.talo.club
+    prod: api.talo.club
+  apiDomainName: ${self:custom.apiDomains.${self:provider.stage}}
+  createApiCustomDomains:
+    dev: true
+    prod: true
+  createApiCustomDomain: ${self:custom.createApiCustomDomains.${self:provider.stage}}
+  s3Bucket: ${self:service}-${self:provider.stage}-uploads
+  asyncJobsQueueName: ${self:service}-${self:provider.stage}-async-jobs
+  asyncJobsDlqName: ${self:service}-${self:provider.stage}-async-jobs-dlq
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node20
+    platform: node
+    format: esm
+    mainFields:
+      - module
+      - main
+    banner:
+      js: |
+        import { createRequire as topLevelCreateRequire } from 'module';
+        const require = topLevelCreateRequire(import.meta.url);
+        import { fileURLToPath as topLevelFileURLToPath, URL as topLevelURL } from 'url';
+        const __filename = topLevelFileURLToPath(import.meta.url);
+        const __dirname = topLevelFileURLToPath(new topLevelURL('.', import.meta.url));
+    external:
+      - pg-native
+      - firebase-admin
+      - "@google-cloud/firestore"
+      - "@google-cloud/storage"
+    outputFileExtension: .mjs
+  serverless-offline:
+    httpPort: 4000
+    noPrependStageInUrl: true
+
+functions:
+  api:
+    handler: src/handlers/api.handler
+    description: HTTP API (Hono router) for talo
+    events:
+      - httpApi: "*"
+
+  asyncJobs:
+    handler: src/handlers/async-jobs.handler
+    description: Async notification and email worker
+    timeout: 30
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - AsyncJobsQueue
+              - Arn
+          batchSize: 10
+          functionResponseType: ReportBatchItemFailures
+
+  scheduled:
+    handler: src/handlers/scheduled.handler
+    description: Example scheduled job (daily reminder)
+    events:
+      - schedule:
+          rate: cron(0 3 * * ? *)
+          enabled: false
+
+resources:
+  Conditions:
+    CreateApiCustomDomain:
+      Fn::Equals:
+        - ${self:custom.createApiCustomDomain}
+        - true
+
+  Resources:
+    ApiCustomDomain:
+      Type: AWS::ApiGatewayV2::DomainName
+      Condition: CreateApiCustomDomain
+      Properties:
+        DomainName: ${self:custom.apiDomainName}
+        DomainNameConfigurations:
+          - CertificateArn:
+              Fn::Sub: arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/${self:custom.apiCertificateId}
+            EndpointType: REGIONAL
+            SecurityPolicy: TLS_1_2
+
+    ApiCustomDomainMapping:
+      Type: AWS::ApiGatewayV2::ApiMapping
+      Properties:
+        DomainName: ${self:custom.apiDomainName}
+        ApiId:
+          Ref: HttpApi
+        Stage:
+          Ref: HttpApiStage
+
+    AsyncJobsDlq:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.asyncJobsDlqName}
+        MessageRetentionPeriod: 1209600
+
+    AsyncJobsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:custom.asyncJobsQueueName}
+        VisibilityTimeout: 180
+        RedrivePolicy:
+          deadLetterTargetArn:
+            Fn::GetAtt:
+              - AsyncJobsDlq
+              - Arn
+          maxReceiveCount: 5
+
+    UploadsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.s3Bucket}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - "*"
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+              AllowedHeaders:
+                - "*"
+              ExposedHeaders:
+                - Content-Disposition
+                - Content-Type
+              MaxAge: 3000
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+  Outputs:
+    ApiCustomDomainName:
+      Description: Custom API domain for this stage.
+      Value: ${self:custom.apiDomainName}
+    ApiCustomDomainTarget:
+      Description: DNS CNAME target for the custom API domain.
+      Value:
+        Fn::If:
+          - CreateApiCustomDomain
+          - Fn::GetAtt:
+              - ApiCustomDomain
+              - RegionalDomainName
+          - Existing API Gateway custom domain; check API Gateway for Regional domain name.

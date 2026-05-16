@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1778831017014,
+      "tag": "0000_glamorous_killer_shrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778853179594,
+      "tag": "0001_household_v1_refactor",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778947200000,
+      "tag": "0002_hra_persistence",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779033600000,
+      "tag": "0003_newsletter_subscribers",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+node_modules
+dist
+.serverless
+.esbuild
+*.log
+.env
+.env.local
+.DS_Store
+.env.dev
+.env.prod
+
+# Firebase
+firebase-service-account-key.json
+firebase-service-account*.json
